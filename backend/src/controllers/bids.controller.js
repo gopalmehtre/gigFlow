@@ -1,6 +1,7 @@
 const Gig = require('../models/Gig');
 const Bid = require('../models/Bid');
 const mongoose = require('mongoose');
+const socketUtil = require('../utils/socket');
 
 const submitBid = async (req, res) => {
   try {
@@ -118,7 +119,22 @@ const hireBid = async (req, res) => {
     );
     await session.commitTransaction();
 
-    res.json({ 
+  
+    try {
+      const io = socketUtil.getIO();
+      if (io) {
+        const userRoom = bid.freelancerId.toString();
+        io.to(userRoom).emit('hired', {
+          message: `You have been hired for ${gig.title}!`,
+          gigId: gig._id,
+          bidId: bid._id
+        });
+      }
+    } catch (emitErr) {
+      console.error('Socket emit error:', emitErr);
+    }
+
+    res.json({
       message: 'Freelancer hired successfully',
       gigId: gig._id,
       bidId: bid._id
