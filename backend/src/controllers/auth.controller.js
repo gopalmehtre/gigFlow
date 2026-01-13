@@ -29,6 +29,7 @@ const register = async(req, res) => {
             user: {id: user._id, name: user.name, email: user.email}
         });
     } catch(err) {
+        console.error('REGISTER ERROR:', err);
         res.status(500).json({message: 'server error'});
     }
 };
@@ -59,8 +60,34 @@ const login = async (req, res) => {
         });
 
     } catch(err) {
-        res.status(500).json({message: 'server error'}, err);
+        console.error('LOGIN ERROR:', err);
+        res.status(500).json({message: 'server error'});
     }
 };
 
-module.exports = {register, login};
+const logout = (req, res) => {
+    try {
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        });
+
+        res.json({message: 'Logout'});
+    }catch(err) {
+        console.error('Logout error:', err);
+        res.status(500).json({message: 'server error'});
+    }
+};
+
+const me = async (req, res) => {
+  try {
+    const user = req.user;
+    res.json({ user: { id: user._id, name: user.name, email: user.email } });
+  } catch (err) {
+    console.error('ME ERROR:', err);
+    res.status(500).json({ message: 'server error' });
+  }
+};
+
+module.exports = { register, login, logout, me };

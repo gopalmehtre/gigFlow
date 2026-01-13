@@ -1,5 +1,6 @@
 const Gig = require('../models/Gig');
 const Bid = require('../models/Bid');
+const mongoose = require('mongoose');
 
 const submitBid = async (req, res) => {
   try {
@@ -10,13 +11,13 @@ const submitBid = async (req, res) => {
       return res.status(400).json({ message: 'Cannot bid on this gig' });
     }
 
-    if (gig.ownerId.toString() === req.user._id.toString()) {
+    if (gig.ownerId.toString() === req.user.id) {
       return res.status(400).json({ message: 'Cannot bid on your own gig' });
     }
 
     const bid = new Bid({
       gigId,
-      freelancerId: req.user._id,
+      freelancerId: req.user.id,
       message,
       price
     });
@@ -35,7 +36,7 @@ const getBids = async (req, res) => {
     const { gigId } = req.params;
 
     const gig = await Gig.findById(gigId);
-    if (!gig || gig.ownerId.toString() !== req.user._id.toString()) {
+    if (!gig || gig.ownerId.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -50,42 +51,88 @@ const getBids = async (req, res) => {
 };
 
 const hireBid = async (req, res) => {
+  const session = await mongoose.startSession();
+  
   try {
+    await session.startTransaction();
+
     const { bidId } = req.params;
 
-    const bid = await Bid.findById(bidId).populate('gigId');
+    const bid = await Bid.findById(bidId).session(session);
     if (!bid) {
+      await session.abortTransaction();
       return res.status(404).json({ message: 'Bid not found' });
     }
 
-    const gig = bid.gigId;
-    if (gig.ownerId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Access denied' });
+    const gig = await Gig.findById(bid.gigId).session(session);
+    if (!gig) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Gig not found' });
+    }
+
+    if (gig.ownerId.toString() !== req.user.id) {
+      await session.abortTransaction();
+      return res.status(403).json({ message: 'Only gig owner can hire' });
     }
 
     if (gig.status !== 'open') {
-      return res.status(400).json({ message: 'Gig is no longer open' });
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        message: 'This gig has already been assigned to someone else' 
+      });
     }
 
-    // Atomic updates
-    const gigUpdate = await Gig.updateOne(
-      { _id: gig._id, status: 'open' },
-      { status: 'assigned' }
+    const gigUpdate = await Gig.findOneAndUpdate(
+      { 
+        _id: gig._id, 
+        status: 'open'
+      },
+      { status: 'assigned' },
+      { 
+        session,
+        new: true 
+      }
     );
 
-    if (gigUpdate.modifiedCount === 0) {
-      return res.status(400).json({ message: 'Gig could not be assigned' });
+    
+    if (!gigUpdate) {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        message: 'Failed to hire - gig was just assigned by someone else' 
+      });
     }
 
-    await Bid.updateOne({ _id: bidId }, { status: 'hired' });
+    await Bid.updateOne(
+      { _id: bidId },
+      { status: 'hired' },
+      { session }
+    );
+
     await Bid.updateMany(
-      { gigId: gig._id, _id: { $ne: bidId } },
-      { status: 'rejected' }
+      { 
+        gigId: gig._id, 
+        _id: { $ne: bidId }
+      },
+      { status: 'rejected' },
+      { session }
     );
+    await session.commitTransaction();
 
-    res.json({ message: 'Freelancer hired successfully' });
+    res.json({ 
+      message: 'Freelancer hired successfully',
+      gigId: gig._id,
+      bidId: bid._id
+    });
+
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    await session.abortTransaction();
+    console.error('Hire transaction failed:', error);
+    res.status(500).json({ 
+      message: 'Failed to hire freelancer',
+      error: error.message 
+    });
+  } finally {
+    session.endSession();
   }
 };
 
