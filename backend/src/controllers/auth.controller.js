@@ -10,7 +10,7 @@ const register = async(req, res) => {
             return res.status(400).json({message: 'User already exists'});
         }
 
-        user = new User({name,email, password});
+        user = new User({name, email, password});
         await user.save();
 
         const token = jwt.sign({id: user._id}, process.env.JWT_SECRET, {
@@ -19,9 +19,10 @@ const register = async(req, res) => {
 
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-            maxAge: 7*24*60*1000
+            secure: true,
+            sameSite: 'none',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/'
         });
 
         res.status(201).json({
@@ -49,9 +50,10 @@ const login = async (req, res) => {
 
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite:process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-            maxAge: 7*24*60*60*1000
+            secure: true,
+            sameSite: 'none',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/'
         });
 
         res.json({
@@ -69,12 +71,13 @@ const logout = (req, res) => {
     try {
         res.clearCookie('token', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite:  process.env.NODE_ENV === 'production' ? 'none' : 'strict'
+            secure: true,
+            sameSite: 'none',
+            path: '/'
         });
 
-        res.json({message: 'Logout'});
-    }catch(err) {
+        res.json({message: 'Logout successful'});
+    } catch(err) {
         console.error('Logout error:', err);
         res.status(500).json({message: 'server error'});
     }
