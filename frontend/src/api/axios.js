@@ -10,6 +10,11 @@ const api = axios.create({
 
 api.interceptors.request.use(
     (config) => {
+        // If cookies don't work, send token via Authorization header
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
         return config;
     },
     (error) => {
@@ -22,6 +27,7 @@ api.interceptors.response.use(
     error => {
         const status = error.response?.status;
         const url = error.config?.url || '';
+        
         if (status === 401 && url.includes('/auth/me')) {
             return Promise.reject(error);
         }

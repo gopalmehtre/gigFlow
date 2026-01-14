@@ -27,6 +27,8 @@ export const AuthProvider = ({ children }) => {
       setUser(data.user);
     } catch (error) {
       setUser(null);
+      // Clear token if auth fails
+      localStorage.removeItem('token');
     } finally {
       setLoading(false);
     }
@@ -35,12 +37,22 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     setUser(data.user);
+    
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+    }
+    
     return data;
   };
 
   const register = async (name, email, password) => {
     const { data } = await api.post('/auth/register', { name, email, password });
     setUser(data.user);
+    
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+    }
+    
     return data;
   };
 
@@ -76,6 +88,7 @@ export const AuthProvider = ({ children }) => {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+      localStorage.removeItem('token');
       setUser(null);
     }
   };

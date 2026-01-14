@@ -1,6 +1,16 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
+const getCookieOptions = () => {
+    return {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/'
+    };
+};
+
 const register = async(req, res) => {
     try {
         const {name, email, password} = req.body;
@@ -17,17 +27,12 @@ const register = async(req, res) => {
             expiresIn: '7d'
         });
 
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-            path: '/'
-        });
+        res.cookie('token', token, getCookieOptions());
 
         res.status(201).json({
             message: 'User registered successfully',
-            user: {id: user._id, name: user.name, email: user.email}
+            user: {id: user._id, name: user.name, email: user.email},
+            token
         });
     } catch(err) {
         console.error('REGISTER ERROR:', err);
@@ -48,17 +53,12 @@ const login = async (req, res) => {
             expiresIn: '7d'
         });
 
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-            path: '/'
-        });
+        res.cookie('token', token, getCookieOptions());
 
         res.json({
             message: 'Login successful',
-            user: {id: user._id, name: user.name, email: user.email}
+            user: {id: user._id, name: user.name, email: user.email},
+            token
         });
 
     } catch(err) {
@@ -69,13 +69,7 @@ const login = async (req, res) => {
 
 const logout = (req, res) => {
     try {
-        res.clearCookie('token', {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'none',
-            path: '/'
-        });
-
+        res.clearCookie('token', getCookieOptions());
         res.json({message: 'Logout successful'});
     } catch(err) {
         console.error('Logout error:', err);
